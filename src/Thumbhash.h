@@ -12,7 +12,7 @@ class ThumbHash {
          * @param image - the image to be converted to a ThumbHash
          * @returns the encoded unsigned 8-bit integer array
         */
-        uint8_t* RGBAToThumbHash(Image image);
+        uint8_t* RGBAToThumbHash(Image *image);
 
         /**
          * Decodes a ThumbHash to an Image.
@@ -20,7 +20,7 @@ class ThumbHash {
          * @param hash - the unsigned 8-bit integer array
          * @returns the decoded image
         */
-        Image ThumbHashToRGBA(uint8_t *hash);
+        Image* ThumbHashToRGBA(uint8_t *hash);
 
         /**
          * Computes the average colour from a given thumbhash.
@@ -43,7 +43,7 @@ class Image {
     public:
         unsigned int width_; /* the width of the image */
         unsigned int height_; /* the height of the image */
-        RGBAPixel *imageData_; /* the RGBA pixels in the image */
+        RGBAPixel *image_data_; /* the RGBA pixels in the image */
 
         /**
          * Constructs an Image using the given width, height, and RGBA pixels.
@@ -52,7 +52,7 @@ class Image {
          * @param height - the height of the image
          * @param pixels - the RGBA pixels in the image, row by row
         */
-        Image(unsigned int width, unsigned int height, RGBAPixel *imageData);
+        Image(unsigned int width, unsigned int height, RGBAPixel *image_data);
 };
 
 class RGBAPixel {
@@ -61,6 +61,12 @@ class RGBAPixel {
         unsigned char green_;
         unsigned char blue_;
         double alpha_;
+
+
+        /**
+         * Constructs an RGBAPixel with default r, g, b, a, values
+        */
+        RGBAPixel();
 
         /**
          * Constructs an RGBAPixel using the given r, g, b, a, values;
