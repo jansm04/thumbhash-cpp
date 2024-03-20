@@ -1,20 +1,22 @@
 #include "Thumbhash.h"
+#include "lodepng/Lodepng.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 using namespace std;
 
-uint8_t* ThumbHash::RGBAToThumbHash(Image *image) {
-    unsigned int width = image->width_;
-    unsigned int height = image->height_;
-    RGBAPixel *image_data = image->image_data_;
+uint8_t* ThumbHash::RGBAToThumbHash(Image image) {
+    unsigned int width = image.width_;
+    unsigned int height = image.height_;
+    RGBAPixel *image_data = image.image_data_;
 
     if (width > 100 || height > 100)
         return {};
 
     // compute average colour
-    float avg_red = 0, avg_green, avg_blue = 0, avg_alpha = 0;
-    for (int i = 0; i < width * height; i++) {
+    float avg_red = 0, avg_green = 0, avg_blue = 0, avg_alpha = 0;
+    for (unsigned int i = 0; i < width * height; i++) {
         RGBAPixel curr_pixel = image_data[i];
         float alpha = curr_pixel.alpha_ / 255.0f;
         avg_red     += alpha / 255.0f * curr_pixel.red_;
@@ -38,12 +40,12 @@ uint8_t* ThumbHash::RGBAToThumbHash(Image *image) {
     float *a = new float[width * height]; // alpha
 
     // convert image from rgba to lpqa
-    for (int i = 0; i < width * height; i++) {
+    for (unsigned int i = 0; i < width * height; i++) {
         RGBAPixel curr_pixel = image_data[i];
         float alpha = curr_pixel.alpha_ / 255.0f;
-        float red   = avg_red   + (1.0f - alpha) + alpha / 255.0f * curr_pixel.red_;
-        float green = avg_green + (1.0f - alpha) + alpha / 255.0f * curr_pixel.green_;
-        float blue  = avg_blue  + (1.0f - alpha) + alpha / 255.0f * curr_pixel.blue_;
+        float red   = avg_red   * (1.0f - alpha) + alpha / 255.0f * curr_pixel.red_;
+        float green = avg_green * (1.0f - alpha) + alpha / 255.0f * curr_pixel.green_;
+        float blue  = avg_blue  * (1.0f - alpha) + alpha / 255.0f * curr_pixel.blue_;
         l[i] = (red + green + blue) / 3.0f;
         p[i] = (red + green) / 2.0f - blue;
         q[i] = red - green;
@@ -88,7 +90,7 @@ uint8_t* ThumbHash::RGBAToThumbHash(Image *image) {
     return hash;
 }
 
-Image* ThumbHash::ThumbHashToRGBA(uint8_t* hash) {
+Image ThumbHash::ThumbHashToRGBA(uint8_t* hash) {
     int header24 = hash[0] | (hash[1] << 8) | (hash[2] << 16);
     int header16 = hash[3] | (hash[4] << 8);
     float l_dc = (float) (header24 & 63) / 63.0f;
@@ -176,18 +178,42 @@ Image* ThumbHash::ThumbHashToRGBA(uint8_t* hash) {
             image_data[y + x].blue_     = (unsigned char) max(0.0f, round(255.0f * min(1.0f, b)));
             image_data[y + x].alpha_    = (unsigned char) max(0.0f, round(255.0f * min(1.0f, a)));
         }
-        return new Image(width, height, image_data);
     }
+    return Image(width, height, image_data);
 }
 
 RGBAPixel ThumbHash::ThumbHashToAverageRGBA(uint8_t *hash) {
-    // todo
+    int header = (hash[0] & 255) | ((hash[1] & 255) << 8) | ((hash[2] & 255) << 16);
+    float l = (float) (header & 63) / 63.0f;
+    float p = (float) ((header >> 6) & 63) / 31.5f - 1.0f;
+    float q = (float) ((header >> 12) & 63) / 31.5f - 1.0f;
+    bool has_alpha = (header >> 23) != 0;
+    float a = has_alpha ? (float) (hash[5] & 15) / 15.0f : 1.0f;
+    float b = l - 2.0f / 3.0f * p;
+    float r = (3.0f * l - b + q) / 2.0f;
+    float g = r - q;
+    return RGBAPixel(
+        max(0.0f, min(1.0f, r)), 
+        max(0.0f, min(1.0f, g)), 
+        max(0.0f, min(1.0f, b)), 
+        a);
 }
 
 double ThumbHash::ThumbHashToApproximateAspectRatio(uint8_t *hash) {
-    // todo
+    uint8_t header = hash[3];
+    bool has_alpha = (hash[2] & 0x80) != 0;
+    bool is_landscape = (hash[4] & 0x80) != 0;
+    int lx = is_landscape ? has_alpha ? 5 : 7 : header & 7;
+    int ly = is_landscape ? header & 7 : has_alpha ? 5 : 7;
+    return (float) lx / (float) ly;
 }
 
+
+Image::Image() {
+    width_      = 0;
+    height_     = 0;
+    image_data_ = nullptr;
+}
 
 Image::Image(unsigned int width, unsigned int height, RGBAPixel *image_data) {
     width_      = width;
@@ -195,14 +221,35 @@ Image::Image(unsigned int width, unsigned int height, RGBAPixel *image_data) {
     image_data_ = image_data;
 }
 
+bool Image::ReadFromFile(string const & fileName) {
+    vector<unsigned char> byte_data;
+    unsigned error = lodepng::decode(byte_data, width_, height_, fileName);
+
+    if (error) {
+      cerr << "PNG decoder error " << error << ": " << lodepng_error_text(error) << endl;
+      return false;
+    }
+
+    image_data_ = new RGBAPixel[width_ * height_];
+
+    for (unsigned i = 0; i < byte_data.size(); i += 4) {
+        RGBAPixel &pixel = image_data_[i/4];
+        pixel.red_      = byte_data[i];
+        pixel.green_    = byte_data[i + 1];
+        pixel.blue_     = byte_data[i + 2];
+        pixel.alpha_    = byte_data[i + 3];
+    }
+    return true;
+}
+
 RGBAPixel::RGBAPixel() {
     red_    = 0;
     green_  = 0;
     blue_   = 0;
-    alpha_  = 1.0;
+    alpha_  = 255;
 }
 
-RGBAPixel::RGBAPixel(unsigned char red, unsigned char green, unsigned char blue, double alpha) {
+RGBAPixel::RGBAPixel(unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha) {
     red_    = red;
     green_  = green;
     blue_   = blue;
@@ -251,7 +298,7 @@ Channel* Channel::Encode(int width, int height, float *channel) {
 int Channel::Decode(uint8_t *hash, int start, int index, float scale) {
     for (int i = 0; i < size_; i++) {
         int data = hash[start + (index >> 1)] >> ((index & 1) << 2);
-        ac_[i] = ((float) (data & 15) / 7.5f - 10.0f) * scale_;
+        ac_[i] = ((float) (data & 15) / 7.5f - 10.0f) * scale;
         index++;
     }
     return index;

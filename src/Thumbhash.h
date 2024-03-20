@@ -1,59 +1,9 @@
+#include <cstdint>
+#include <string>
 #ifndef _THUMBHASH_H_
 #define _THUMBHASH_H_
 
 using namespace std;
-
-class ThumbHash {
-    public:
-
-        /**
-         * Encodes an Image to a ThumbHash.
-         * 
-         * @param image - the image to be converted to a ThumbHash
-         * @returns the encoded unsigned 8-bit integer array
-        */
-        uint8_t* RGBAToThumbHash(Image *image);
-
-        /**
-         * Decodes a ThumbHash to an Image.
-         * 
-         * @param hash - the unsigned 8-bit integer array
-         * @returns the decoded image
-        */
-        Image* ThumbHashToRGBA(uint8_t *hash);
-
-        /**
-         * Computes the average colour from a given thumbhash.
-         * 
-         * @param hash - the unsigned 8-bit integer array
-         * @returns the average rgba values
-        */
-        RGBAPixel ThumbHashToAverageRGBA(uint8_t *hash);
-
-        /**
-         * Computes the approximate aspect ratio (width / height) from a given thumbhash.
-         * 
-         * @param hash - the unsigned 8-bit integer array
-         * @returns the approximate aspect ratio
-        */
-        double ThumbHashToApproximateAspectRatio(uint8_t *hash);
-};
-
-class Image {
-    public:
-        unsigned int width_; /* the width of the image */
-        unsigned int height_; /* the height of the image */
-        RGBAPixel *image_data_; /* the RGBA pixels in the image */
-
-        /**
-         * Constructs an Image using the given width, height, and RGBA pixels.
-         * 
-         * @param width - the width of the image
-         * @param height - the height of the image
-         * @param pixels - the RGBA pixels in the image, row by row
-        */
-        Image(unsigned int width, unsigned int height, RGBAPixel *image_data);
-};
 
 class RGBAPixel {
     public:
@@ -74,9 +24,84 @@ class RGBAPixel {
          * @param red - the red value for the new pixel, in [0, 255].
          * @param green - the green value for the new pixel, in [0, 255].
          * @param blue - the blue value for the new pixel, in [0, 255].
-         * @param alpha - the alpha value for the new pixel, in [0, 1].
+         * @param alpha - the alpha value for the new pixel, in [0, 255].
         */
-       RGBAPixel(unsigned char red, unsigned char green, unsigned char blue, double alpha);
+       RGBAPixel(unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha);
+};
+
+class Image {
+    public:
+        unsigned int width_; /* the width of the image */
+        unsigned int height_; /* the height of the image */
+        RGBAPixel *image_data_; /* the RGBA pixels in the image */
+
+        /**
+         * Constructs a default Image. 
+         * The default width and height is 0, with no RGBA pixels.
+        */
+        Image();
+
+        /**
+         * Constructs an Image using the given width, height, and RGBA pixels.
+         * 
+         * @param width - the width of the image
+         * @param height - the height of the image
+         * @param pixels - the RGBA pixels in the image, row by row
+        */
+        Image(unsigned int width, unsigned int height, RGBAPixel *image_data);
+
+        /**
+         * Reads in a PNG image from a file.
+         * Overwrites any current image content in the PNG.
+         * 
+         * @param fileName - name of the file to be read from.
+         * @return true, if the image was successfully read and loaded.
+         */
+        bool ReadFromFile(string const & fileName);
+
+        /**
+         * Writes a PNG image to a file.
+         * 
+         * @param fileName - name of the file to be written.
+         * @return true, if the image was successfully written.
+         */
+        bool WriteToFile(string const & fileName);
+};
+
+class ThumbHash {
+    public:
+
+        /**
+         * Encodes an Image to a ThumbHash.
+         * 
+         * @param image - the image to be converted to a ThumbHash
+         * @returns the encoded unsigned 8-bit integer array
+        */
+        uint8_t* RGBAToThumbHash(Image image);
+
+        /**
+         * Decodes a ThumbHash to an Image.
+         * 
+         * @param hash - the unsigned 8-bit integer array
+         * @returns the decoded image
+        */
+        Image ThumbHashToRGBA(uint8_t *hash);
+
+        /**
+         * Computes the average colour from a given thumbhash.
+         * 
+         * @param hash - the unsigned 8-bit integer array
+         * @returns the average rgba values
+        */
+        RGBAPixel ThumbHashToAverageRGBA(uint8_t *hash);
+
+        /**
+         * Computes the approximate aspect ratio (width / height) from a given thumbhash.
+         * 
+         * @param hash - the unsigned 8-bit integer array
+         * @returns the approximate aspect ratio
+        */
+        double ThumbHashToApproximateAspectRatio(uint8_t *hash);
 };
 
 class Channel {
