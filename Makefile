@@ -23,4 +23,4 @@ main.o : examples/main.cpp src/lodepng/lodepng.h src/thumbhash.h
 	$(CXX) $(CXXFLAGS) examples/main.cpp -o main.o
 
 clean :
-	-rm -f *.o $(EXE) examples/images-output/*
+	-rm -f *.o $(EXE) examples/images-output/*.png
