@@ -1,5 +1,5 @@
 #include "Thumbhash.h"
-#include "lodepng/Lodepng.h"
+#include "../util/lodepng/Lodepng.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>

@@ -13,13 +13,13 @@ $(EXE) : $(OBJS_EXE)
 	$(LD) $(OBJS_EXE) $(LDFLAGS) -o $(EXE)
 
 #object files
-lodepng.o : src/lodepng/lodepng.cpp src/lodepng/lodepng.h
-	$(CXX) $(CXXFLAGS) src/lodepng/lodepng.cpp -o lodepng.o
+lodepng.o : util/lodepng/lodepng.cpp util/lodepng/lodepng.h
+	$(CXX) $(CXXFLAGS) util/lodepng/lodepng.cpp -o lodepng.o
 
 thumbhash.o : src/thumbhash.cpp src/thumbhash.h
 	$(CXX) $(CXXFLAGS) src/thumbhash.cpp -o thumbhash.o
 
-main.o : examples/main.cpp src/lodepng/lodepng.h src/thumbhash.h
+main.o : examples/main.cpp util/lodepng/lodepng.h src/thumbhash.h
 	$(CXX) $(CXXFLAGS) examples/main.cpp -o main.o
 
 clean :
