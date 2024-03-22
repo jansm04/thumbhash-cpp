@@ -6927,7 +6927,6 @@ unsigned decode(std::vector<unsigned char>& out, unsigned& w, unsigned& h, const
     std::cout << "An error occurred loading the file." << std::endl;
     return error;
   }
-  std::cout << "File loaded successfully." << std::endl;
   return decode(out, w, h, buffer, colortype, bitdepth);
 }
 #endif /* LODEPNG_COMPILE_DECODER */

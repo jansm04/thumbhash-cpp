@@ -70,6 +70,7 @@ class Image {
 
 class ThumbHash {
     public:
+        int hash_size_;
 
         /**
          * Encodes an Image to a ThumbHash.
@@ -140,7 +141,7 @@ class Channel {
          * @param scale - the scale for the decoded values
          * @returns the current index in the decoder
         */
-        int Decode(uint8_t *hash, int start, int index, float scale);
+        int Decode(uint8_t *hash, int start, int index, int size, float scale);
 
         /**
          * Writes the encoded varying terms into the array and returns the index

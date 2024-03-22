@@ -60,28 +60,29 @@ uint8_t* ThumbHash::RGBAToThumbHash(Image image) {
 
     // write constants
     bool is_landscape = width > height;
-    int header24 = (int) round(63.0f * l_channel->dc_) 
-            | ((int) round(31.5f + 31.5f * p_channel->dc_) << 6)
-            | ((int) round(31.5f + 31.5f * q_channel->dc_) << 12)
-            | ((int) round(31.0f * l_channel->scale_) << 18)
+    int header24 = ((int) round(63.0f * l_channel->dc_))
+            | (((int) round(31.5f + 31.5f * p_channel->dc_)) << 6)
+            | (((int) round(31.5f + 31.5f * q_channel->dc_)) << 12)
+            | (((int) round(31.0f * l_channel->scale_)) << 18)
             | (has_alpha ? 1 << 23 : 0);
     int header16 = (is_landscape ? ly : lx)
-            | ((int) round(63.0f * p_channel->scale_) << 3)
-            | ((int) round(63.0f * q_channel->scale_) << 9)
+            | (((int) round(63.0f * p_channel->scale_)) << 3)
+            | (((int) round(63.0f * q_channel->scale_)) << 9)
             | (is_landscape ? 1 << 15 : 0);
     int ac_start = has_alpha ? 6 : 5;
-    int ac_count = l_channel->size_ + p_channel->size_ + q_channel->size_ + (has_alpha ? a_channel->size_ : 0);
-    uint8_t *hash = new uint8_t[ac_start + (ac_count + 1) / 2];
+    int ac_count = l_channel->size_ + p_channel->size_ + q_channel->size_
+            + (has_alpha ? a_channel->size_ : 0);
+    hash_size_ = ac_start + (ac_count + 1) / 2;
+    uint8_t *hash = new uint8_t[hash_size_];
     hash[0] = (uint8_t) header24;
-    hash[1] = (uint8_t) header24 >> 8;
-    hash[2] = (uint8_t) header24 >> 16;
+    hash[1] = (uint8_t) (header24 >> 8);
+    hash[2] = (uint8_t) (header24 >> 16);
     hash[3] = (uint8_t) header16;
-    hash[4] = (uint8_t) header16 >> 8;
-    if (has_alpha) 
-        hash[5] = ((uint8_t) round(15.0f * a_channel->dc_)) | 
-            (((uint8_t) round(15.0f * a_channel->scale_)) << 4);
-    
-    // write the varying factors
+    hash[4] = (uint8_t) (header16 >> 8);
+    if (has_alpha) hash[5] = (uint8_t) (((int) round(15.0f * a_channel->dc_))
+            | (((int) round(15.0f * a_channel->scale_)) << 4));
+
+    // Write the varying factors
     int ac_index = 0;
     ac_index = l_channel->Write(hash, ac_start, ac_index);
     ac_index = p_channel->Write(hash, ac_start, ac_index);
@@ -91,8 +92,8 @@ uint8_t* ThumbHash::RGBAToThumbHash(Image image) {
 }
 
 Image ThumbHash::ThumbHashToRGBA(uint8_t* hash) {
-    int header24 = hash[0] | (hash[1] << 8) | (hash[2] << 16);
-    int header16 = hash[3] | (hash[4] << 8);
+    int header24 = (hash[0] & 255) | ((hash[1] & 255) << 8) | ((hash[2] & 255) << 16);
+    int header16 = (hash[3] & 255) | ((hash[4] & 255) << 8);
     float l_dc = (float) (header24 & 63) / 63.0f;
     float p_dc = (float) ((header24 >> 6) & 63) / 31.5f - 1.0f;
     float q_dc = (float) ((header24 >> 12) & 63) / 31.5f - 1.0f;
@@ -106,6 +107,12 @@ Image ThumbHash::ThumbHashToRGBA(uint8_t* hash) {
     float a_dc = has_alpha ? (float) (hash[5] & 15) / 15.0f : 1.0f;
     float a_scale = (float) ((hash[5] >> 4) & 15) / 15.0f;
 
+    // compute size of l_ac
+    int n = 0;
+    for (int cy = 0; cy < ly; cy++)
+        for (int cx = cy > 0 ? 0 : 1; cx * ly < lx * (ly - cy); cx++)
+            n++;
+
     // read the varying factors and boost saturation by 1.25x to compensate for quantization
     int ac_start = has_alpha ? 6 : 5;
     int ac_index = 0;
@@ -113,29 +120,30 @@ Image ThumbHash::ThumbHashToRGBA(uint8_t* hash) {
     Channel *p_channel = new Channel(3, 3);
     Channel *q_channel = new Channel(3, 3);
     Channel *a_channel = nullptr;
-    ac_index = l_channel->Decode(hash, ac_start, ac_index, l_scale);
-    ac_index = p_channel->Decode(hash, ac_start, ac_index, p_scale * 1.25f);
-    ac_index = q_channel->Decode(hash, ac_start, ac_index, q_scale * 1.25f);
+    ac_index = l_channel->Decode(hash, ac_start, ac_index, n, l_scale);
+    ac_index = p_channel->Decode(hash, ac_start, ac_index, 5, p_scale * 1.25f);
+    ac_index = q_channel->Decode(hash, ac_start, ac_index, 5, q_scale * 1.25f);
     if (has_alpha) {
         a_channel = new Channel(5, 5);
-        a_channel->Decode(hash, ac_start, ac_index, a_scale);
+        a_channel->Decode(hash, ac_start, ac_index, 14, a_scale);
     }
     float *l_ac = l_channel->ac_;
-    float *p_ac = l_channel->ac_;
+    float *p_ac = p_channel->ac_;
     float *q_ac = q_channel->ac_;
     float *a_ac = has_alpha ? a_channel->ac_ : nullptr;
 
     // decode to RGB using the DCT
     float ratio = ThumbHashToApproximateAspectRatio(hash);
-    int width = round(ratio > 1.0f ? 32.0f : 32.0f * ratio);
-    int height = round(ratio > 1.0f ? 32.0f / ratio : 32.0f); 
+    unsigned int width = round(ratio > 1.0f ? 32.0f : 32.0f * ratio);
+    unsigned int height = round(ratio > 1.0f ? 32.0f / ratio : 32.0f); 
+
     RGBAPixel *image_data = new RGBAPixel[width * height];
     int cx_stop = max(lx, has_alpha ? 5 : 3);
     int cy_stop = max(ly, has_alpha ? 5 : 3);
     float *fx = new float[cx_stop];
     float *fy = new float[cy_stop];
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
+    for (unsigned int y = 0; y < height; y++) {
+        for (unsigned int x = 0; x < width; x++) {
             float l = l_dc, p = p_dc, q = q_dc, a = a_dc;
 
             // precompute the coefficients
@@ -173,10 +181,10 @@ Image ThumbHash::ThumbHashToRGBA(uint8_t* hash) {
             float b = l - 2.0f / 3.0f * p;
             float r = (3.0f * l - b + q) / 2.0f;
             float g = r - q;
-            image_data[y + x].red_      = (unsigned char) max(0.0f, round(255.0f * min(1.0f, r)));
-            image_data[y + x].green_    = (unsigned char) max(0.0f, round(255.0f * min(1.0f, g)));
-            image_data[y + x].blue_     = (unsigned char) max(0.0f, round(255.0f * min(1.0f, b)));
-            image_data[y + x].alpha_    = (unsigned char) max(0.0f, round(255.0f * min(1.0f, a)));
+            image_data[x + y * width].red_      = (unsigned char) max(0.0f, round(255.0f * min(1.0f, r)));
+            image_data[x + y * width].green_    = (unsigned char) max(0.0f, round(255.0f * min(1.0f, g)));
+            image_data[x + y * width].blue_     = (unsigned char) max(0.0f, round(255.0f * min(1.0f, b)));
+            image_data[x + y * width].alpha_    = (unsigned char) max(0.0f, round(255.0f * min(1.0f, a)));
         }
     }
     return Image(width, height, image_data);
@@ -224,14 +232,12 @@ Image::Image(unsigned int width, unsigned int height, RGBAPixel *image_data) {
 bool Image::ReadFromFile(string const & fileName) {
     vector<unsigned char> byte_data;
     unsigned error = lodepng::decode(byte_data, width_, height_, fileName);
-
     if (error) {
       cerr << "PNG decoder error " << error << ": " << lodepng_error_text(error) << endl;
       return false;
     }
 
     image_data_ = new RGBAPixel[width_ * height_];
-
     for (unsigned i = 0; i < byte_data.size(); i += 4) {
         RGBAPixel &pixel = image_data_[i/4];
         pixel.red_      = byte_data[i];
@@ -240,6 +246,22 @@ bool Image::ReadFromFile(string const & fileName) {
         pixel.alpha_    = byte_data[i + 3];
     }
     return true;
+}
+
+bool Image::WriteToFile(string const & fileName) {
+    unsigned char *byte_data = new unsigned char[width_ * height_ * 4];
+    for (unsigned i = 0; i < width_ * height_; i++) {
+        byte_data[(i * 4)]     = image_data_[i].red_;
+        byte_data[(i * 4) + 1] = image_data_[i].green_;
+        byte_data[(i * 4) + 2] = image_data_[i].blue_;
+        byte_data[(i * 4) + 3] = image_data_[i].alpha_;
+    }
+
+    unsigned error = lodepng::encode(fileName, byte_data, width_, height_);
+    if (error)
+        cerr << "PNG encoding error " << error << ": " << lodepng_error_text(error) << endl;
+
+    return (error == 0);
 }
 
 RGBAPixel::RGBAPixel() {
@@ -271,7 +293,7 @@ Channel* Channel::Encode(int width, int height, float *channel) {
     int n = 0;
     float *fx = new float[width];
     for (int cy = 0; cy < ny_; cy++) {
-        for (int cx = cy > 0 ? 0 : 1; cx * ny_ < nx_ * (ny_ - cy); cx++) {
+        for (int cx = 0; cx * ny_ < nx_ * (ny_ - cy); cx++) {
             float f = 0;
             for (int x = 0; x < width; x++)
                 fx[x] = (float) cos(M_PI / width * cx * (x + 0.5f));
@@ -280,25 +302,27 @@ Channel* Channel::Encode(int width, int height, float *channel) {
                 for (int x = 0; x < width; x++)
                     f += channel[x + y * width] * fx[x] * fy;
             }
-            f /= width * height;
+            f /= width * height; // get average weight per pixel
+
             if (cx > 0 || cy > 0) {
                 ac_[n++] = f; // store encoded value
-                scale_ = max(scale_, abs(f));
+                scale_ = max(scale_, abs(f)); // keep track of largest AC value
             } else {
                 dc_ = f;
             }
         }
     }
     if (scale_ > 0) 
-        for (int i = 0; i < size_; i++)
+        for (int i = 0; i < size_; i++) {
             ac_[i] = 0.5f + 0.5f / scale_ * ac_[i];
+        }
     return this;
 }
 
-int Channel::Decode(uint8_t *hash, int start, int index, float scale) {
-    for (int i = 0; i < size_; i++) {
+int Channel::Decode(uint8_t *hash, int start, int index, int size, float scale) {
+    for (int i = 0; i < size; i++) {
         int data = hash[start + (index >> 1)] >> ((index & 1) << 2);
-        ac_[i] = ((float) (data & 15) / 7.5f - 10.0f) * scale;
+        ac_[i] = ((float) (data & 15) / 7.5f - 1.0f) * scale;
         index++;
     }
     return index;
