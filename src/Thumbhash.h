@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <string>
+#include <vector>
 #ifndef _THUMBHASH_H_
 #define _THUMBHASH_H_
 
@@ -33,7 +34,7 @@ class Image {
     public:
         unsigned int width_; /* the width of the image */
         unsigned int height_; /* the height of the image */
-        RGBAPixel *image_data_; /* the RGBA pixels in the image */
+        vector<RGBAPixel> image_data_; /* the RGBA pixels in the image */
 
         /**
          * Constructs a default Image. 
@@ -48,7 +49,7 @@ class Image {
          * @param height - the height of the image
          * @param pixels - the RGBA pixels in the image, row by row
         */
-        Image(unsigned int width, unsigned int height, RGBAPixel *image_data);
+        Image(unsigned int width, unsigned int height, vector<RGBAPixel> image_data);
 
         /**
          * Reads in a PNG image from a file.
@@ -70,15 +71,13 @@ class Image {
 
 class ThumbHash {
     public:
-        int hash_size_;
-
         /**
          * Encodes an Image to a ThumbHash.
          * 
          * @param image - the image to be converted to a ThumbHash
          * @returns the encoded unsigned 8-bit integer array
         */
-        uint8_t* RGBAToThumbHash(Image image);
+        vector<uint8_t> RGBAToThumbHash(Image image);
 
         /**
          * Decodes a ThumbHash to an Image.
@@ -86,7 +85,7 @@ class ThumbHash {
          * @param hash - the unsigned 8-bit integer array
          * @returns the decoded image
         */
-        Image ThumbHashToRGBA(uint8_t *hash);
+        Image ThumbHashToRGBA(vector<uint8_t> hash);
 
         /**
          * Computes the average colour from a given thumbhash.
@@ -94,7 +93,7 @@ class ThumbHash {
          * @param hash - the unsigned 8-bit integer array
          * @returns the average rgba values
         */
-        RGBAPixel ThumbHashToAverageRGBA(uint8_t *hash);
+        RGBAPixel ThumbHashToAverageRGBA(vector<uint8_t> hash);
 
         /**
          * Computes the approximate aspect ratio (width / height) from a given thumbhash.
@@ -102,7 +101,7 @@ class ThumbHash {
          * @param hash - the unsigned 8-bit integer array
          * @returns the approximate aspect ratio
         */
-        double ThumbHashToApproximateAspectRatio(uint8_t *hash);
+        double ThumbHashToApproximateAspectRatio(vector<uint8_t> hash);
 };
 
 class Channel {
@@ -110,9 +109,8 @@ class Channel {
         int nx_;
         int ny_;
         float dc_;
-        float *ac_;
+        vector<float> ac_;
         float scale_;
-        int size_;
 
         /**
          * Constructs a colour channel using the given nx and ny values
@@ -130,7 +128,7 @@ class Channel {
          * @param channel - the channel values for each pixel in the image
          * @returns the Channel object
         */
-        Channel* Encode(int width, int height, float *channel);
+        Channel* Encode(int width, int height, vector<float> channel);
 
         /**
          * Decodes the varying terms and returns the index
@@ -141,7 +139,7 @@ class Channel {
          * @param scale - the scale for the decoded values
          * @returns the current index in the decoder
         */
-        int Decode(uint8_t *hash, int start, int index, int size, float scale);
+        int Decode(vector<uint8_t> hash, int start, int index, float scale);
 
         /**
          * Writes the encoded varying terms into the array and returns the index
@@ -151,7 +149,7 @@ class Channel {
          * @param index - the current index in the decoder
          * @returns the current index in the decoder
         */
-        int Write(uint8_t *hash, int start, int index);
+        int Write(vector<uint8_t>& hash, int start, int index);
 };
 
 #endif
