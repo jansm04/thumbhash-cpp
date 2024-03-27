@@ -89,6 +89,11 @@ vector<uint8_t> ThumbHash::RGBAToThumbHash(Image image) {
     ac_index = p_channel->Write(hash, ac_start, ac_index);
     ac_index = q_channel->Write(hash, ac_start, ac_index);
     if (has_alpha) a_channel->Write(hash, ac_start, ac_index);
+    delete l_channel;
+    delete p_channel;
+    delete q_channel;
+    delete a_channel;
+
     return hash;
 }
 
@@ -188,6 +193,11 @@ Image ThumbHash::ThumbHashToRGBA(vector<uint8_t> hash) {
             image_data[x + y * width].alpha_    = (unsigned char) max(0.0f, round(255.0f * min(1.0f, a)));
         }
     }
+    delete l_channel;
+    delete p_channel;
+    delete q_channel;
+    delete a_channel;
+    
     return Image(width, height, image_data);
 }
 
